@@ -6,8 +6,9 @@ from pydantic import BaseModel, Field
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
-from ratelimit import limits, sleep_and_retry
+from ratelimit import limits, sleep_and_retry, RateLimitException
 from typing import List
+import time
 
 # Load environment variables
 load_dotenv()
@@ -36,6 +37,13 @@ class EnhancedChunk(BaseModel):
 # Rate limiting decorator
 @sleep_and_retry
 @limits(calls=5, period=60)
+def rate_limited_api_call(model, response_model, messages):
+    return client.chat.completions.create(
+        model=model,
+        response_model=response_model,
+        messages=messages
+    )
+
 def process_text(text):
     # Tokenize the text into sentences
     sentences = nltk.sent_tokenize(text)
@@ -46,14 +54,18 @@ def process_text(text):
         text_with_artifacts += f"{sentence} [{i}]\n"
 
     # Use OpenAI to determine chunk boundaries with Instructor validation
-    chunks: TextChunks = client.chat.completions.create(
-        model="gpt-4o-mini",
-        response_model=TextChunks,
-        messages=[
-            {"role": "system", "content": "You are an AI assistant tasked with chunking a text into cohesive sections. Your goal is to create chunks that maintain topic coherence and context."},
-            {"role": "user", "content": f"Here's a text with numbered artifacts. Determine the best chunks by specifying start and end artifact numbers. Make the chunks as large as possible while maintaining coherence. Provide a thorough context for each chunk, including information from the rest of the text to ensure the chunk makes good sense. Here's the text:\n\n{text_with_artifacts}"}
-        ],
-    )
+    try:
+        chunks: TextChunks = rate_limited_api_call(
+            model="gpt-4-turbo-preview",
+            response_model=TextChunks,
+            messages=[
+                {"role": "system", "content": "You are an AI assistant tasked with chunking a text into cohesive sections. Your goal is to create chunks that maintain topic coherence and context."},
+                {"role": "user", "content": f"Here's a text with numbered artifacts. Determine the best chunks by specifying start and end artifact numbers. Make the chunks as large as possible while maintaining coherence. Provide a thorough context for each chunk, including information from the rest of the text to ensure the chunk makes good sense. Here's the text:\n\n{text_with_artifacts}"}
+            ]
+        )
+    except RateLimitException:
+        st.error("Rate limit exceeded. Please wait a moment before trying again.")
+        return None
 
     # Create the final chunked entries with enhanced information
     chunked_entries = []
@@ -83,14 +95,15 @@ def main():
             try:
                 with st.spinner("Processing text..."):
                     chunks = process_text(user_text)
+                
+                if chunks:
+                    st.success("Text processed successfully!")
 
-                st.success("Text processed successfully!")
-
-                # Display chunks
-                for chunk in chunks:
-                    with st.expander(f"Chunk {chunk.order} (Sentences {chunk.start}-{chunk.end})"):
-                        st.write("**Context:**", chunk.context)
-                        st.write("**Text:**", chunk.text)
+                    # Display chunks
+                    for chunk in chunks:
+                        with st.expander(f"Chunk {chunk.order} (Sentences {chunk.start}-{chunk.end})"):
+                            st.write("**Context:**", chunk.context)
+                            st.write("**Text:**", chunk.text)
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
         else:
