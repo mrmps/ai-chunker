@@ -60,7 +60,7 @@ def process_text(text):
             response_model=TextChunks,
             messages=[
                 {"role": "system", "content": "You are an AI assistant tasked with chunking a text into cohesive sections. Your goal is to create chunks that maintain topic coherence and context."},
-                {"role": "user", "content": f"Here's a text with numbered artifacts. Determine the best chunks by specifying start and end artifact numbers. Make the chunks as large as possible while maintaining coherence. Provide a thorough context for each chunk, including information from the rest of the text to ensure the chunk makes good sense. Here's the text:\n\n{text_with_artifacts}"}
+                {"role": "user", "content": f"Here's a text with numbered artifacts. Determine the best chunks by specifying start and end artifact numbers. Make the chunks as large as possible while maintaining coherence. Provide a thorough context for each chunk, including information from the rest of the text to ensure the chunk makes good sense. Ensure no overlap between chunks, and also not gaps. the end of one chunk should be the start of the next. Here's the text:\n\n{text_with_artifacts}"}
             ]
         )
     except RateLimitException:
