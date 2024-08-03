@@ -56,7 +56,7 @@ def process_text(text):
     # Use OpenAI to determine chunk boundaries with Instructor validation
     try:
         chunks: TextChunks = rate_limited_api_call(
-            model="gpt-4-turbo-preview",
+            model="gpt-4o-mini",
             response_model=TextChunks,
             messages=[
                 {"role": "system", "content": "You are an AI assistant tasked with chunking a text into cohesive sections. Your goal is to create chunks that maintain topic coherence and context."},
